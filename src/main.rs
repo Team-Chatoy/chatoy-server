@@ -19,6 +19,7 @@ async fn main() {
 
   let app = Router::new()
     .route("/", get(|| async { "Hello, world!" }))
+    .route("/login", post(routers::login))
     .route("/users", get(routers::get_user_list))
     .route("/users", post(routers::register))
     .with_state(shared_state);

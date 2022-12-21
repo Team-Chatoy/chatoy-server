@@ -10,7 +10,7 @@ use crate::{AppState, entities::{prelude::*, user}};
 use super::Resp;
 
 #[derive(Deserialize)]
-pub struct RegisterPayload {
+pub struct UserPayload {
   username: String,
   password: String,
 }
@@ -28,7 +28,7 @@ async fn check_username(
 
 pub async fn register(
   State(state): State<Arc<AppState>>,
-  Json(payload): Json<RegisterPayload>,
+  Json(payload): Json<UserPayload>,
 ) -> (StatusCode, Json<Resp>) {
   match check_username(&state.db, &payload.username).await {
     Err(_) => {
@@ -78,4 +78,43 @@ pub async fn get_user_list(
     Ok(users) => (StatusCode::OK, Json(users)),
     Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![])),
   }
+}
+
+pub async fn login(
+  State(state): State<Arc<AppState>>,
+  Json(payload): Json<UserPayload>,
+) -> (StatusCode, Json<Resp>) {
+  let user = User::find()
+    .filter(user::Column::Username.eq(payload.username))
+    .one(&state.db).await;
+
+  if user.is_err() {
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(Resp { code: 1, msg: "Error accessing database!" }),
+    );
+  }
+
+  let user = user.unwrap();
+
+  if user.is_none() {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(Resp { code: 2, msg: "The user does not exist!" }),
+    );
+  }
+
+  let user = user.unwrap();
+
+  let password_hashed = blake3::hash(payload.password.as_bytes()).to_string();
+
+  if user.password != password_hashed {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(Resp { code: 3, msg: "Password error!" }),
+    );
+  }
+
+  // TODO: Generate jwt token
+  todo!()
 }

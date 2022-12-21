@@ -2,7 +2,7 @@ mod user;
 
 use serde::Serialize;
 
-pub use user::{get_user_list, register};
+pub use user::{login, register, get_user_list};
 
 #[derive(Serialize)]
 pub struct Resp {
