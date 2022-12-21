@@ -85,6 +85,7 @@ pub async fn login(
   Json(payload): Json<UserPayload>,
 ) -> (StatusCode, Json<Resp>) {
   let user = User::find()
+    .filter(user::Column::Status.ne(1))
     .filter(user::Column::Username.eq(payload.username))
     .one(&state.db).await;
 
@@ -106,12 +107,19 @@ pub async fn login(
 
   let user = user.unwrap();
 
+  if user.status == 2 {
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(Resp { code: 3, msg: "The user has been banned!" }),
+    );
+  }
+
   let password_hashed = blake3::hash(payload.password.as_bytes()).to_string();
 
   if user.password != password_hashed {
     return (
       StatusCode::BAD_REQUEST,
-      Json(Resp { code: 3, msg: "Password error!" }),
+      Json(Resp { code: 4, msg: "Password error!" }),
     );
   }
 
