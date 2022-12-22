@@ -9,21 +9,18 @@ impl MigrationTrait for Migration {
     manager
       .create_table(
         Table::create()
-          .table(User::Table)
+          .table(Room::Table)
           .if_not_exists()
           .col(
-            ColumnDef::new(User::Id)
+            ColumnDef::new(Room::Id)
               .integer()
               .not_null()
               .auto_increment()
               .primary_key(),
           )
-          .col(ColumnDef::new(User::Username).string().not_null())
-          .col(ColumnDef::new(User::Nickname).string().not_null())
-          .col(ColumnDef::new(User::Password).string_len(64).not_null())
-          .col(ColumnDef::new(User::Slogan).string().not_null())
-          .col(ColumnDef::new(User::Status).integer().not_null())
-          .col(ColumnDef::new(User::Registered).timestamp().not_null())
+          .col(ColumnDef::new(Room::Name).string().not_null())
+          .col(ColumnDef::new(Room::Description).string().not_null())
+          .col(ColumnDef::new(Room::Created).timestamp().not_null())
           .to_owned(),
       )
       .await
@@ -31,20 +28,17 @@ impl MigrationTrait for Migration {
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
     manager
-      .drop_table(Table::drop().table(User::Table).to_owned())
+      .drop_table(Table::drop().table(Room::Table).to_owned())
       .await
   }
 }
 
 /// Learn more at https://docs.rs/sea-query#iden
 #[derive(Iden)]
-enum User {
+enum Room {
   Table,
   Id,
-  Username,
-  Nickname,
-  Password,
-  Slogan,
-  Status,
-  Registered,
+  Name,
+  Description,
+  Created,
 }

@@ -8,11 +8,13 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.68"
 blake3 = "1.3.3"
+rand = "0.8.5"
+chrono = "0.4.23"
 serde = { version = "1.0.151", features = ["derive"] }
 jsonwebtoken = "8.2.0"
 futures = "0.3.25"
 tokio = { version = "1.23.0", features = ["macros"] }
-axum = "0.6.1"
+axum = { version = "0.6.1", features = ["headers", "ws"] }
 
 [dependencies.sea-orm]
 version = "0.10.5"
