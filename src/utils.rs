@@ -2,7 +2,7 @@ use anyhow::{Result, bail};
 use chrono::Local;
 use sea_orm::{EntityTrait, DatabaseConnection, ActiveValue};
 
-use crate::entities::{prelude::*, user, member};
+use crate::entities::{prelude::*, user, member, room};
 
 pub async fn auth(
   db: &DatabaseConnection,
@@ -47,12 +47,12 @@ pub async fn user_in_room(
 
 pub async fn join_room(
   db: &DatabaseConnection,
-  user: i32,
-  room: i32,
+  user: &user::Model,
+  room: &room::Model,
 ) -> Result<()> {
   let new_member = member::ActiveModel {
-    user: ActiveValue::Set(user),
-    room: ActiveValue::Set(room),
+    user: ActiveValue::Set(user.id),
+    room: ActiveValue::Set(room.id),
     joined: ActiveValue::Set(Local::now()),
   };
 

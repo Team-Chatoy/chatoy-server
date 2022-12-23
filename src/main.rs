@@ -45,6 +45,7 @@ async fn main() {
     .route("/rooms", post(routers::new_room))
     .route("/rooms", get(routers::get_room_list))
     .route("/members", get(routers::get_member_list))
+    .route("/rooms/:id/join", post(routers::join_room))
     .with_state(shared_state);
 
   axum::Server::bind(&"0.0.0.0:4000".parse().unwrap())
