@@ -1,23 +1,45 @@
 mod entities;
 mod utils;
 mod routers;
+mod msg;
 mod ws;
 
 use std::sync::Arc;
 
+use tokio::sync::broadcast;
 use axum::{Router, routing::{get, post}};
 use sea_orm::{Database, DatabaseConnection};
 
+use crate::msg::Msg;
+
+#[macro_use]
+extern crate log;
+
+#[derive(Clone, Debug)]
+struct MsgChannel {
+  token: String,
+  msg: Msg,
+}
+
 pub struct AppState {
   db: DatabaseConnection,
+  sender: broadcast::Sender<MsgChannel>,
 }
 
 #[tokio::main]
 async fn main() {
+  env_logger::init();
+
   let db = Database::connect("sqlite:./data.db?mode=rwc").await
     .expect("Error opening database!");
 
-  let shared_state = Arc::new(AppState { db });
+  info!("Database connected!");
+
+  let (sender, _) = broadcast::channel::<MsgChannel>(256);
+
+  info!("Broadcast channel created!");
+
+  let shared_state = Arc::new(AppState { db, sender });
 
   let app = Router::new()
     .route("/", get(|| async { "Hello, Chatoy!" }))

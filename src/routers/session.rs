@@ -8,6 +8,8 @@ use crate::{AppState, entities::{prelude::*, session}};
 pub async fn get_session_list(
   State(state): State<Arc<AppState>>,
 ) -> (StatusCode, Json<Vec<session::Model>>) {
+  warn!("GET /sessions");
+
   let sessions = Session::find().all(&state.db).await;
 
   match sessions {

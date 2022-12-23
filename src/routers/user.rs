@@ -32,14 +32,18 @@ pub async fn register(
   State(state): State<Arc<AppState>>,
   Json(payload): Json<UserPayload>,
 ) -> (StatusCode, Json<Resp>) {
+  info!("POST /users");
+
   match check_username(&state.db, &payload.username).await {
     Err(_) => {
+      error!("Error accessing database!");
       return (
         StatusCode::INTERNAL_SERVER_ERROR,
         Json(Resp { code: 1, msg: "Error accessing database!".to_string() }),
       );
     },
     Ok(false) => {
+      info!("Username `{}` has been used!", payload.username);
       return (
         StatusCode::BAD_REQUEST,
         Json(Resp { code: 2, msg: "This username has been used!".to_string() }),
@@ -52,7 +56,7 @@ pub async fn register(
   let password_hashed = blake3::hash(payload.password.as_bytes()).to_string();
 
   let new_user = user::ActiveModel {
-    username: ActiveValue::Set(payload.username),
+    username: ActiveValue::Set(payload.username.clone()),
     nickname: ActiveValue::Set(nickname),
     password: ActiveValue::Set(password_hashed),
     slogan: ActiveValue::Set(String::new()),
@@ -62,20 +66,28 @@ pub async fn register(
   };
 
   match User::insert(new_user).exec(&state.db).await {
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(Resp { code: 3, msg: "Failed to insert a new user into the database!".to_string() }),
-    ),
-    Ok(_) => (
-      StatusCode::CREATED,
-      Json(Resp { code: 0, msg: String::new() }),
-    ),
+    Err(_) => {
+      error!("Failed to insert a new user into the database!");
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(Resp { code: 3, msg: "Failed to insert a new user into the database!".to_string() }),
+      )
+    },
+    Ok(_) => {
+      info!("Registered a new user `{}`", payload.username);
+      (
+        StatusCode::CREATED,
+        Json(Resp { code: 0, msg: String::new() }),
+      )
+    },
   }
 }
 
 pub async fn get_user_list(
   State(state): State<Arc<AppState>>,
 ) -> (StatusCode, Json<Vec<user::Model>>) {
+  warn!("GET /users");
+
   let users = User::find().all(&state.db).await;
 
   match users {
@@ -89,12 +101,15 @@ pub async fn login(
   TypedHeader(user_agent): TypedHeader<UserAgent>,
   Json(payload): Json<UserPayload>,
 ) -> (StatusCode, Json<Resp>) {
+  info!("POST /login");
+
   let user = User::find()
     .filter(user::Column::Status.ne(1))
     .filter(user::Column::Username.eq(payload.username))
     .one(&state.db).await;
 
   if user.is_err() {
+    error!("Error accessing database!");
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
       Json(Resp { code: 1, msg: "Error accessing database!".to_string() }),
@@ -104,6 +119,7 @@ pub async fn login(
   let user = user.unwrap();
 
   if user.is_none() {
+    info!("The user does not exist!");
     return (
       StatusCode::BAD_REQUEST,
       Json(Resp { code: 2, msg: "The user does not exist!".to_string() }),
@@ -113,6 +129,7 @@ pub async fn login(
   let user = user.unwrap();
 
   if user.status == 2 {
+    info!("The user has been banned!");
     return (
       StatusCode::BAD_REQUEST,
       Json(Resp { code: 3, msg: "The user has been banned!".to_string() }),
@@ -122,6 +139,7 @@ pub async fn login(
   let password_hashed = blake3::hash(payload.password.as_bytes()).to_string();
 
   if user.password != password_hashed {
+    info!("Password error!");
     return (
       StatusCode::BAD_REQUEST,
       Json(Resp { code: 4, msg: "Password error!".to_string() }),
@@ -149,13 +167,19 @@ pub async fn login(
   };
 
   match Session::insert(new_session).exec(&state.db).await {
-    Err(_) => (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(Resp { code: 5, msg: "Failed to insert new session into the database!".to_string() }),
-    ),
-    Ok(_) => (
-      StatusCode::OK,
-      Json(Resp { code: 0, msg: token }),
-    ),
+    Err(_) => {
+      error!("Failed to insert new session into the database!");
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(Resp { code: 5, msg: "Failed to insert new session into the database!".to_string() }),
+      )
+    },
+    Ok(_) => {
+      info!("Logged in as `{}`", user.username);
+      (
+        StatusCode::OK,
+        Json(Resp { code: 0, msg: token }),
+      )
+    },
   }
 }
