@@ -37,8 +37,8 @@ pub async fn ws(
 async fn handle_ws(
   state: Arc<AppState>,
   socket: WebSocket,
-) {
-  info!("New WebSocket connection...");
+) -> () {
+  info!("[ws] New WebSocket connection...");
 
   let (ws_out, mut ws_in) = socket.split();
 
@@ -47,20 +47,29 @@ async fn handle_ws(
   loop {
     let msg = ws_in.next().await;
 
+    if msg.is_none() {
+      info!("[ws] WebSocket connection closed without authenticating!");
+      return;
+    }
+
     if let Some(Ok(msg)) = msg {
       let msg = msg.to_text().unwrap();
+
+      if msg == "" { // The last message is always an empty string
+        continue;
+      }
 
       let msg = serde_json::from_str(msg);
 
       if let Err(err) = msg {
-        error!("{err}");
+        error!("[ws] {err}");
         continue;
       }
 
       let msg: WsEvent = msg.unwrap();
 
       if let WsEvent::Auth(auth_msg) = msg {
-        info!("Authenticating WebSocket connection...");
+        info!("[ws] Authenticating WebSocket connection...");
 
         user = match auth(&state.db, &auth_msg.token).await {
           Ok(user) => user,
@@ -70,7 +79,7 @@ async fn handle_ws(
           },
         };
 
-        info!("WebSocket connection authenticated!");
+        info!("[ws] WebSocket connection authenticated!");
 
         break;
       }
@@ -92,27 +101,44 @@ async fn read(
   user: user::Model,
   state: Arc<AppState>,
   ws_in: SplitStream<WebSocket>,
-) {
+) -> () {
   ws_in
     .for_each(|msg| async {
       let msg = msg.unwrap();
       let msg = msg.to_text().unwrap();
-      let msg: WsEvent = serde_json::from_str(msg).unwrap();
 
-      info!("Received message: {:?}", msg);
+      if msg == "" { // The last message is always an empty string
+        return;
+      }
+
+      let msg = serde_json::from_str(msg);
+
+      if let Err(err) = msg {
+        error!("[ws_in] {err}");
+        return;
+      }
+
+      let msg: WsEvent = msg.unwrap();
+
+      info!("[ws_in] Received message: {:?}", msg);
 
       if let WsEvent::Msg(msg) = msg {
-        state.sender
-          .send(Msg {
-            uuid: msg.uuid,
-            sender: user.id,
-            room: msg.room,
-            data: msg.data,
-            sent: Local::now(),
-            modified: false,
-          }).unwrap();
+        let msg = Msg {
+          uuid: msg.uuid,
+          sender: user.id,
+          room: msg.room,
+          data: msg.data,
+          sent: Local::now(),
+          modified: false,
+        };
+
+        // TODO: The server should save the message to the database.
+
+        state.sender.send(msg).unwrap();
       }
     }).await;
+
+  info!("[ws_in] Authenticated WebSocket connection closed!");
 }
 
 #[derive(Serialize)]
@@ -125,14 +151,14 @@ async fn write(
   user: user::Model,
   state: Arc<AppState>,
   mut ws_out: SplitSink<WebSocket, Message>,
-) {
+) -> () {
   let mut receiver = state.sender.subscribe();
 
-  loop {
+  loop { // TODO: gracefully exit (maybe let the `read` task notify this task)
     let msg = receiver.recv().await;
 
     if let Err(err) = msg {
-      error!("{err}");
+      error!("[ws_out] {err}");
       continue;
     }
 
@@ -145,7 +171,7 @@ async fn write(
         }
       },
       Err(err) => {
-        error!("{err}");
+        error!("[ws_out] {err}");
         continue;
       },
     }
@@ -156,6 +182,6 @@ async fn write(
           r#type: "Recv",
           data: msg,
         }).unwrap()
-      )).await.unwrap();
+      )).await.unwrap(); // TODO: This `unwrap` is not safe, because the `write` task will not exit gracefully
   }
 }
