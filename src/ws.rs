@@ -6,7 +6,7 @@ use axum::{extract::{ws::{WebSocketUpgrade, WebSocket, Message}, State}, respons
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{AppState, utils::auth, entities::user, msg::{MsgContent, Msg}};
+use crate::{AppState, utils::{auth, user_in_room}, entities::user, msg::{MsgContent, Msg}};
 
 #[derive(Debug, Deserialize)]
 struct AuthEvent {
@@ -43,7 +43,6 @@ async fn handle_ws(
   let (ws_out, mut ws_in) = socket.split();
 
   let user: user::Model;
-  let token: String;
 
   loop {
     let msg = ws_in.next().await;
@@ -71,8 +70,6 @@ async fn handle_ws(
           },
         };
 
-        token = auth_msg.token;
-
         info!("WebSocket connection authenticated!");
 
         break;
@@ -82,18 +79,17 @@ async fn handle_ws(
 
   tokio::spawn(
     write(
-      token.clone(),
+      user.clone(),
       state.clone(),
       ws_out,
     )
   );
 
-  tokio::spawn(read(user, token, state, ws_in));
+  tokio::spawn(read(user, state, ws_in));
 }
 
 async fn read(
   user: user::Model,
-  token: String,
   state: Arc<AppState>,
   ws_in: SplitStream<WebSocket>,
 ) {
@@ -107,16 +103,13 @@ async fn read(
 
       if let WsEvent::Msg(msg) = msg {
         state.sender
-          .send(crate::MsgChannel {
-            token: token.to_string(),
-            msg: Msg {
-              uuid: msg.uuid,
-              sender: user.id,
-              room: msg.room,
-              data: msg.data,
-              sent: Local::now(),
-              modified: false,
-            },
+          .send(Msg {
+            uuid: msg.uuid,
+            sender: user.id,
+            room: msg.room,
+            data: msg.data,
+            sent: Local::now(),
+            modified: false,
           }).unwrap();
       }
     }).await;
@@ -129,7 +122,7 @@ struct MsgForward {
 }
 
 async fn write(
-  token: String,
+  user: user::Model,
   state: Arc<AppState>,
   mut ws_out: SplitSink<WebSocket, Message>,
 ) {
@@ -145,15 +138,23 @@ async fn write(
 
     let msg = msg.unwrap();
 
-    if msg.token == token {
-      continue;
+    match user_in_room(&state.db, user.id, msg.room).await {
+      Ok(in_room) => {
+        if !in_room {
+          continue;
+        }
+      },
+      Err(err) => {
+        error!("{err}");
+        continue;
+      },
     }
 
     ws_out
       .send(Message::Text(
         serde_json::to_string(&MsgForward {
           r#type: "Recv",
-          data: msg.msg,
+          data: msg,
         }).unwrap()
       )).await.unwrap();
   }

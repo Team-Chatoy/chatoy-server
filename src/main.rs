@@ -15,15 +15,9 @@ use crate::msg::Msg;
 #[macro_use]
 extern crate log;
 
-#[derive(Clone, Debug)]
-struct MsgChannel {
-  token: String,
-  msg: Msg,
-}
-
 pub struct AppState {
   db: DatabaseConnection,
-  sender: broadcast::Sender<MsgChannel>,
+  sender: broadcast::Sender<Msg>,
 }
 
 #[tokio::main]
@@ -35,7 +29,7 @@ async fn main() {
 
   info!("Database connected!");
 
-  let (sender, _) = broadcast::channel::<MsgChannel>(256);
+  let (sender, _) = broadcast::channel::<Msg>(256);
 
   info!("Broadcast channel created!");
 

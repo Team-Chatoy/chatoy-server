@@ -34,6 +34,17 @@ pub async fn auth(
   }
 }
 
+pub async fn user_in_room(
+  db: &DatabaseConnection,
+  user: i32,
+  room: i32,
+) -> Result<bool> {
+  let member = Member::find_by_id((user, room))
+    .one(db).await?;
+
+  Ok(member.is_some())
+}
+
 pub async fn join_room(
   db: &DatabaseConnection,
   user: i32,
