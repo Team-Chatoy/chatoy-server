@@ -1,9 +1,16 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
-use axum::{extract::{State, Path}, http::StatusCode, Json};
-use sea_orm::{EntityTrait, ActiveValue};
+use axum::{
+  extract::{State, Path},
+  http::StatusCode,
+  Json,
+  TypedHeader,
+  headers::{Authorization, authorization::Bearer},
+};
+use sea_orm::{EntityTrait, ActiveValue, QueryFilter, ColumnTrait};
+use tokio::task::JoinHandle;
 
 use crate::{AppState, entities::{prelude::*, room, member}, utils::{auth, self}};
 
@@ -165,4 +172,104 @@ pub async fn join_room(
       )
     },
   }
+}
+
+pub async fn get_room(
+  State(state): State<Arc<AppState>>,
+  Path(id): Path<i32>,
+) -> (StatusCode, Json<ErrOr<room::Model>>) {
+  info!("GET /rooms/{}", id);
+
+  let room = Room::find_by_id(id)
+    .one(&state.db).await;
+
+  if let Err(_) = room {
+    error!("Error accessing database!");
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrOr::Err(Resp { code: 1, msg: "Error accessing database!".to_string() })),
+    );
+  }
+
+  let room = room.unwrap();
+
+  if room.is_none() {
+    info!("The room does not exist!");
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(ErrOr::Err(Resp { code: 2, msg: "The room does not exist!".to_string() })),
+    );
+  }
+
+  let room = room.unwrap();
+
+  (StatusCode::OK, Json(ErrOr::Res(room)))
+}
+
+pub async fn get_my_room(
+  State(state): State<Arc<AppState>>,
+  TypedHeader(token): TypedHeader<Authorization<Bearer>>
+) -> (StatusCode, Json<Vec<room::Model>>) {
+  let user = auth(&state.db, token.token()).await;
+
+  if let Err(err) = user {
+    error!("{err}");
+    return (
+      StatusCode::UNAUTHORIZED,
+      Json(vec![]),
+    );
+  }
+
+  let user = user.unwrap();
+
+  let members = Member::find()
+    .filter(member::Column::User.eq(user.id))
+    .all(&state.db).await;
+
+  if let Err(err) = members {
+    error!("{err}");
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(vec![]),
+    );
+  }
+
+  let members = members.unwrap();
+
+  let rooms = Arc::new(Mutex::new(vec![]));
+
+  let tasks: Vec<JoinHandle<()>> = members.into_iter()
+    .map(|member| {
+      let state = state.clone();
+      let rooms = rooms.clone();
+      tokio::task::spawn(async move {
+        let room = Room::find_by_id(member.room)
+          .one(&state.db).await;
+  
+        if let Err(err) = room {
+          error!("{err}");
+          return;
+        }
+  
+        let room = room.unwrap();
+  
+        if room.is_none() {
+          error!("Room `{}` not found!", member.room);
+          return;
+        }
+  
+        let room = room.unwrap();
+  
+        rooms.lock().unwrap().push(room);
+      })
+    })
+    .collect();
+
+  for task in tasks {
+    task.await.unwrap();
+  }
+
+  let rooms = rooms.lock().unwrap().clone();
+
+  (StatusCode::OK, Json(rooms))
 }

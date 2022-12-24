@@ -5,11 +5,11 @@ use chrono::Local;
 use rand::Rng;
 use serde::Deserialize;
 use sea_orm::{ActiveValue, EntityTrait, QueryFilter, ColumnTrait, DatabaseConnection};
-use axum::{extract::{Json, State, TypedHeader}, http::StatusCode, headers::UserAgent};
+use axum::{extract::{Json, State, TypedHeader, Path}, http::StatusCode, headers::UserAgent};
 
 use crate::{AppState, entities::{prelude::*, user, session}};
 
-use super::Resp;
+use super::{Resp, ErrOr};
 
 #[derive(Deserialize)]
 pub struct UserPayload {
@@ -182,4 +182,36 @@ pub async fn login(
       )
     },
   }
+}
+
+pub async fn get_user(
+  State(state): State<Arc<AppState>>,
+  Path(id): Path<i32>,
+) -> (StatusCode, Json<ErrOr<user::Model>>) {
+  info!("GET /users/{}", id);
+
+  let user = User::find_by_id(id)
+    .one(&state.db).await;
+
+  if let Err(_) = user {
+    error!("Error accessing database!");
+    return (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrOr::Err(Resp { code: 1, msg: "Error accessing database!".to_string() })),
+    );
+  }
+
+  let user = user.unwrap();
+
+  if user.is_none() {
+    info!("The user does not exist!");
+    return (
+      StatusCode::BAD_REQUEST,
+      Json(ErrOr::Err(Resp { code: 2, msg: "The user does not exist!".to_string() })),
+    );
+  }
+
+  let user = user.unwrap();
+
+  (StatusCode::OK, Json(ErrOr::Res(user)))
 }

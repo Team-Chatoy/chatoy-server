@@ -4,9 +4,16 @@ mod room;
 
 use serde::Serialize;
 
-pub use user::{login, register, get_user_list};
+pub use user::{login, register, get_user_list, get_user};
 pub use session::get_session_list;
-pub use room::{new_room, get_room_list, get_member_list, join_room};
+pub use room::{
+  new_room,
+  get_room_list,
+  get_member_list,
+  join_room,
+  get_room,
+  get_my_room,
+};
 
 #[derive(Serialize)]
 pub struct Resp {
