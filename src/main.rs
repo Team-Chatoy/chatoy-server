@@ -7,7 +7,8 @@ mod ws;
 use std::sync::Arc;
 
 use tokio::sync::broadcast;
-use axum::{Router, routing::{get, post}};
+use tower_http::cors::{CorsLayer, self};
+use axum::{Router, routing::{get, post}, http::{self, Method}};
 use sea_orm::{Database, DatabaseConnection};
 
 use crate::msg::Msg;
@@ -36,6 +37,12 @@ async fn main() {
   let shared_state = Arc::new(AppState { db, sender });
 
   let app = Router::new()
+    .layer(
+      CorsLayer::new()
+        .allow_origin(cors::Any)
+        .allow_methods(vec![Method::GET, Method::POST])
+        .allow_headers(vec![http::header::CONTENT_TYPE]),
+    )
     .route("/", get(|| async { "Hello, Chatoy!" }))
     .route("/ws", get(ws::ws))
     .route("/login", post(routers::login))
