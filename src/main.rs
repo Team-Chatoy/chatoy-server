@@ -37,12 +37,6 @@ async fn main() {
   let shared_state = Arc::new(AppState { db, sender });
 
   let app = Router::new()
-    .layer(
-      CorsLayer::new()
-        .allow_origin(cors::Any)
-        .allow_methods(vec![Method::GET, Method::POST])
-        .allow_headers(vec![http::header::CONTENT_TYPE]),
-    )
     .route("/", get(|| async { "Hello, Chatoy!" }))
     .route("/ws", get(ws::ws))
     .route("/login", post(routers::login))
@@ -53,6 +47,12 @@ async fn main() {
     .route("/rooms", get(routers::get_room_list))
     .route("/members", get(routers::get_member_list))
     .route("/rooms/:id/join", post(routers::join_room))
+    .layer(
+      CorsLayer::new()
+        .allow_origin(cors::Any)
+        .allow_methods(vec![Method::GET, Method::POST])
+        .allow_headers(vec![http::header::CONTENT_TYPE]),
+    )
     .with_state(shared_state);
 
   axum::Server::bind(&"0.0.0.0:4000".parse().unwrap())
