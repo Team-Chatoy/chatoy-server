@@ -40,7 +40,7 @@ async fn handle_ws(
 ) -> () {
   info!("[ws] New WebSocket connection...");
 
-  let (ws_out, mut ws_in) = socket.split();
+  let (mut ws_out, mut ws_in) = socket.split();
 
   let user: user::Model;
 
@@ -74,10 +74,19 @@ async fn handle_ws(
         user = match auth(&state.db, &auth_msg.token).await {
           Ok(user) => user,
           Err(err) => {
-            error!("{err}");
+            error!("[ws] {err}");
+            ws_out
+              .send(Message::Text(
+                format!("{{\"type\":\"Auth\",\"code\":1,\"msg\":\"{}\"}}", err.to_string())
+              )).await.unwrap();
             continue;
           },
         };
+
+        ws_out
+          .send(Message::Text(
+            r#"{"type":"Auth","code":0,"msg":""}"#.to_string()
+          )).await.unwrap();
 
         info!("[ws] WebSocket connection authenticated!");
 
