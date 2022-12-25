@@ -54,7 +54,10 @@ async fn main() {
       CorsLayer::new()
         .allow_origin(cors::Any)
         .allow_methods(vec![Method::GET, Method::POST])
-        .allow_headers(vec![http::header::CONTENT_TYPE]),
+        .allow_headers(vec![
+          http::header::CONTENT_TYPE,
+          http::header::AUTHORIZATION,
+        ]),
     )
     .with_state(shared_state);
 
