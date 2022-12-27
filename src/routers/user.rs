@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::Local;
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sea_orm::{ActiveValue, EntityTrait, QueryFilter, ColumnTrait, DatabaseConnection};
 use axum::{extract::{Json, State, TypedHeader, Path}, http::StatusCode, headers::UserAgent};
 
@@ -96,11 +96,18 @@ pub async fn get_user_list(
   }
 }
 
+#[derive(Serialize)]
+pub struct LoginResp {
+  code: i32,
+  msg: String,
+  user: Option<user::Model>,
+}
+
 pub async fn login(
   State(state): State<Arc<AppState>>,
   TypedHeader(user_agent): TypedHeader<UserAgent>,
   Json(payload): Json<UserPayload>,
-) -> (StatusCode, Json<Resp>) {
+) -> (StatusCode, Json<LoginResp>) {
   info!("POST /login");
 
   let user = User::find()
@@ -112,7 +119,7 @@ pub async fn login(
     error!("Error accessing database!");
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
-      Json(Resp { code: 1, msg: "Error accessing database!".to_string() }),
+      Json(LoginResp { code: 1, msg: "Error accessing database!".to_string(), user: None }),
     );
   }
 
@@ -122,7 +129,7 @@ pub async fn login(
     info!("The user does not exist!");
     return (
       StatusCode::BAD_REQUEST,
-      Json(Resp { code: 2, msg: "The user does not exist!".to_string() }),
+      Json(LoginResp { code: 2, msg: "The user does not exist!".to_string(), user: None }),
     );
   }
 
@@ -132,7 +139,7 @@ pub async fn login(
     info!("The user has been banned!");
     return (
       StatusCode::BAD_REQUEST,
-      Json(Resp { code: 3, msg: "The user has been banned!".to_string() }),
+      Json(LoginResp { code: 3, msg: "The user has been banned!".to_string(), user: None }),
     );
   }
 
@@ -142,7 +149,7 @@ pub async fn login(
     info!("Password error!");
     return (
       StatusCode::BAD_REQUEST,
-      Json(Resp { code: 4, msg: "Password error!".to_string() }),
+      Json(LoginResp { code: 4, msg: "Password error!".to_string(), user: None }),
     );
   }
 
@@ -173,14 +180,14 @@ pub async fn login(
       error!("Failed to insert new session into the database!");
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(Resp { code: 5, msg: "Failed to insert new session into the database!".to_string() }),
+        Json(LoginResp { code: 5, msg: "Failed to insert new session into the database!".to_string(), user: None }),
       )
     },
     Ok(_) => {
       info!("Logged in as `{}`", user.username);
       (
         StatusCode::OK,
-        Json(Resp { code: 0, msg: token }),
+        Json(LoginResp { code: 0, msg: token, user: Some(user) }),
       )
     },
   }
