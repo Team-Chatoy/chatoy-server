@@ -216,5 +216,5 @@ async fn write(
       )).await.unwrap();
   }
 
-  info!("[ws_in] Authenticated WebSocket connection closed!");
+  info!("[ws_out] Authenticated WebSocket connection closed!");
 }
