@@ -146,7 +146,7 @@ pub async fn join_room(
 
   let room = room.unwrap();
 
-  if let None = room {
+  if room.is_none() {
     error!("Room `{id}` not found!");
     return (
       StatusCode::BAD_REQUEST,
@@ -183,7 +183,7 @@ pub async fn get_room(
   let room = Room::find_by_id(id)
     .one(&state.db).await;
 
-  if let Err(_) = room {
+  if room.is_err() {
     error!("Error accessing database!");
     return (
       StatusCode::INTERNAL_SERVER_ERROR,

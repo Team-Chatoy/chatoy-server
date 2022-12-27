@@ -37,7 +37,7 @@ pub async fn ws(
 async fn handle_ws(
   state: Arc<AppState>,
   socket: WebSocket,
-) -> () {
+) {
   info!("[ws] New WebSocket connection...");
 
   let (mut ws_out, mut ws_in) = socket.split();
@@ -55,7 +55,7 @@ async fn handle_ws(
     if let Some(Ok(msg)) = msg {
       let msg = msg.to_text().unwrap();
 
-      if msg == "" { // The last message is always an empty string
+      if msg.is_empty() { // The last message is always an empty string
         continue;
       }
 
@@ -77,7 +77,7 @@ async fn handle_ws(
             error!("[ws] {err}");
             ws_out
               .send(Message::Text(
-                format!("{{\"type\":\"Auth\",\"code\":1,\"msg\":\"{}\"}}", err.to_string())
+                format!("{{\"type\":\"Auth\",\"code\":1,\"msg\":\"{err}\"}}")
               )).await.unwrap();
             continue;
           },
@@ -110,13 +110,13 @@ async fn read(
   user: user::Model,
   state: Arc<AppState>,
   ws_in: SplitStream<WebSocket>,
-) -> () {
+) {
   ws_in
     .for_each(|msg| async {
       let msg = msg.unwrap();
       let msg = msg.to_text().unwrap();
 
-      if msg == "" { // The last message is always an empty string
+      if msg.is_empty() { // The last message is always an empty string
         return;
       }
 
@@ -160,7 +160,7 @@ async fn write(
   user: user::Model,
   state: Arc<AppState>,
   mut ws_out: SplitSink<WebSocket, Message>,
-) -> () {
+) {
   let mut receiver = state.sender.subscribe();
 
   loop { // TODO: gracefully exit (maybe let the `read` task notify this task)

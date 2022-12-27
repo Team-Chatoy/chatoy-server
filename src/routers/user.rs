@@ -158,12 +158,14 @@ pub async fn login(
       .collect()
   };
 
+  let now = Local::now();
+
   let new_session = session::ActiveModel {
     token: ActiveValue::Set(token.clone()),
     user: ActiveValue::Set(user.id),
     agent: ActiveValue::Set(user_agent.to_string()),
-    generated: ActiveValue::Set(Local::now()),
-    expired: ActiveValue::Set(Local::now() + chrono::Duration::days(2)),
+    generated: ActiveValue::Set(now),
+    expired: ActiveValue::Set(now + chrono::Duration::days(2)), // TODO: set a more appropriate expiration time
   };
 
   match Session::insert(new_session).exec(&state.db).await {
@@ -193,7 +195,7 @@ pub async fn get_user(
   let user = User::find_by_id(id)
     .one(&state.db).await;
 
-  if let Err(_) = user {
+  if user.is_err() {
     error!("Error accessing database!");
     return (
       StatusCode::INTERNAL_SERVER_ERROR,
