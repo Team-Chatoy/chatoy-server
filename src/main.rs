@@ -2,6 +2,7 @@ mod entities;
 mod utils;
 mod routers;
 mod msg;
+mod channel;
 mod ws;
 
 use std::sync::Arc;
@@ -11,14 +12,14 @@ use tower_http::cors::{CorsLayer, self};
 use axum::{Router, routing::{get, post}, http::{self, Method}};
 use sea_orm::{Database, DatabaseConnection};
 
-use crate::msg::Msg;
+use crate::channel::ChannelEvent;
 
 #[macro_use]
 extern crate log;
 
 pub struct AppState {
   db: DatabaseConnection,
-  sender: broadcast::Sender<Msg>,
+  sender: broadcast::Sender<ChannelEvent>,
 }
 
 #[tokio::main]
@@ -30,7 +31,7 @@ async fn main() {
 
   info!("Database connected!");
 
-  let (sender, _) = broadcast::channel::<Msg>(256);
+  let (sender, _) = broadcast::channel::<ChannelEvent>(256);
 
   info!("Broadcast channel created!");
 

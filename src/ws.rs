@@ -6,7 +6,7 @@ use axum::{extract::{ws::{WebSocketUpgrade, WebSocket, Message}, State}, respons
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{AppState, utils::{auth, user_in_room}, entities::user, msg::{MsgContent, Msg}};
+use crate::{AppState, utils::{auth, user_in_room}, entities::user, msg::{MsgContent, Msg}, channel::ChannelEvent};
 
 #[derive(Debug, Deserialize)]
 struct AuthEvent {
@@ -43,6 +43,7 @@ async fn handle_ws(
   let (mut ws_out, mut ws_in) = socket.split();
 
   let user: user::Model;
+  let token: String;
 
   loop {
     let msg = ws_in.next().await;
@@ -90,6 +91,8 @@ async fn handle_ws(
 
         info!("[ws] WebSocket connection authenticated!");
 
+        token = auth_msg.token;
+
         break;
       }
     }
@@ -97,16 +100,18 @@ async fn handle_ws(
 
   tokio::spawn(
     write(
+      token.clone(),
       user.clone(),
       state.clone(),
       ws_out,
     )
   );
 
-  tokio::spawn(read(user, state, ws_in));
+  tokio::spawn(read(token, user, state, ws_in));
 }
 
 async fn read(
+  token: String,
   user: user::Model,
   state: Arc<AppState>,
   ws_in: SplitStream<WebSocket>,
@@ -143,10 +148,13 @@ async fn read(
 
         // TODO: The server should save the message to the database.
 
-        state.sender.send(msg).unwrap();
+        state.sender
+          .send(ChannelEvent::new_msg(msg)).unwrap();
       }
     }).await;
 
+  state.sender
+    .send(ChannelEvent::new_close(token)).unwrap();
   info!("[ws_in] Authenticated WebSocket connection closed!");
 }
 
@@ -157,13 +165,14 @@ struct MsgForward {
 }
 
 async fn write(
+  token: String,
   user: user::Model,
   state: Arc<AppState>,
   mut ws_out: SplitSink<WebSocket, Message>,
 ) {
   let mut receiver = state.sender.subscribe();
 
-  loop { // TODO: gracefully exit (maybe let the `read` task notify this task)
+  loop {
     let msg = receiver.recv().await;
 
     if let Err(err) = msg {
@@ -172,6 +181,19 @@ async fn write(
     }
 
     let msg = msg.unwrap();
+
+    let msg = match msg {
+      ChannelEvent::Msg(msg_event) => {
+        msg_event.msg
+      },
+      ChannelEvent::Close(close_event) => {
+        if token == close_event.token {
+          break;
+        } else {
+          continue;
+        }
+      },
+    };
 
     match user_in_room(&state.db, user.id, msg.room).await {
       Ok(in_room) => {
@@ -191,6 +213,8 @@ async fn write(
           r#type: "Recv",
           data: msg,
         }).unwrap()
-      )).await.unwrap(); // TODO: This `unwrap` is not safe, because the `write` task will not exit gracefully
+      )).await.unwrap();
   }
+
+  info!("[ws_in] Authenticated WebSocket connection closed!");
 }
