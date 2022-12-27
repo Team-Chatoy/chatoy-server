@@ -6,12 +6,12 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
 #[sea_orm(table_name = "session")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub token: String,
-    pub user: i32,
-    pub agent: String,
-    pub generated: DateTimeLocal,
-    pub expired: DateTimeLocal,
+  #[sea_orm(primary_key, auto_increment = false)]
+  pub token: String,
+  pub user: i32,
+  pub agent: String,
+  pub generated: DateTimeLocal,
+  pub expired: DateTimeLocal,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

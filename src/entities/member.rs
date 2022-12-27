@@ -6,11 +6,11 @@ use sea_orm::entity::prelude::*;
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize)]
 #[sea_orm(table_name = "member")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub user: i32,
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub room: i32,
-    pub joined: DateTimeLocal,
+  #[sea_orm(primary_key, auto_increment = false)]
+  pub user: i32,
+  #[sea_orm(primary_key, auto_increment = false)]
+  pub room: i32,
+  pub joined: DateTimeLocal,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
