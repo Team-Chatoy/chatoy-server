@@ -75,7 +75,7 @@ pub async fn new_room(
       )
     },
     Ok(_) => {
-      info!("New room created: {room_id}");
+      info!("New room created: `{room_id}`");
       (
         StatusCode::CREATED,
         Json(ErrOr::Res(NewRoomResp { id: room_id })),
@@ -150,7 +150,7 @@ pub async fn join_room(
     error!("Room `{id}` not found!");
     return (
       StatusCode::BAD_REQUEST,
-      Json(Resp { code: 3, msg: "Room not found!".to_string() }),
+      Json(Resp { code: 3, msg: format!("Room `{id}` not found!") }),
     );
   }
 
@@ -161,7 +161,7 @@ pub async fn join_room(
       error!("Failed to join the room `{id}`!");
       (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(Resp { code: 4, msg: "Failed to join the new room!".to_string() }),
+        Json(Resp { code: 4, msg: format!("Failed to join the room `{id}`!") }),
       )
     },
     Ok(_) => {
@@ -194,10 +194,10 @@ pub async fn get_room(
   let room = room.unwrap();
 
   if room.is_none() {
-    info!("The room does not exist!");
+    info!("The room `{id}` does not exist!");
     return (
       StatusCode::BAD_REQUEST,
-      Json(ErrOr::Err(Resp { code: 2, msg: "The room does not exist!".to_string() })),
+      Json(ErrOr::Err(Resp { code: 2, msg: format!("The room `{id}` does not exist!") })),
     );
   }
 
