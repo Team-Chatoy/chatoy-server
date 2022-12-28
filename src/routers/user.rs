@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use chrono::Local;
+use chrono::{Local, DateTime};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sea_orm::{ActiveValue, EntityTrait, QueryFilter, ColumnTrait, DatabaseConnection};
@@ -10,6 +10,29 @@ use axum::{extract::{Json, State, TypedHeader, Path}, http::StatusCode, headers:
 use crate::{AppState, entities::{prelude::*, user, session}};
 
 use super::{Resp, ErrOr};
+
+#[derive(Serialize)]
+pub struct UserWithoutPasswd {
+  id: i32,
+  username: String,
+  nickname: String,
+  slogan: String,
+  status: i32,
+  registered: DateTime<Local>,
+}
+
+impl UserWithoutPasswd {
+  pub fn new(user: user::Model) -> Self {
+    Self {
+      id: user.id,
+      username: user.username,
+      nickname: user.nickname,
+      slogan: user.slogan,
+      status: user.status,
+      registered: user.registered,
+    }
+  }
+}
 
 #[derive(Deserialize)]
 pub struct UserPayload {
@@ -100,7 +123,7 @@ pub async fn get_user_list(
 pub struct LoginResp {
   code: i32,
   msg: String,
-  user: Option<user::Model>,
+  user: Option<UserWithoutPasswd>,
 }
 
 pub async fn login(
@@ -187,7 +210,7 @@ pub async fn login(
       info!("Logged in as `{}`", user.username);
       (
         StatusCode::OK,
-        Json(LoginResp { code: 0, msg: token, user: Some(user) }),
+        Json(LoginResp { code: 0, msg: token, user: Some(UserWithoutPasswd::new(user)) }),
       )
     },
   }
@@ -196,7 +219,7 @@ pub async fn login(
 pub async fn get_user(
   State(state): State<Arc<AppState>>,
   Path(id): Path<i32>,
-) -> (StatusCode, Json<ErrOr<user::Model>>) {
+) -> (StatusCode, Json<ErrOr<UserWithoutPasswd>>) {
   info!("GET /users/{}", id);
 
   let user = User::find_by_id(id)
@@ -222,5 +245,5 @@ pub async fn get_user(
 
   let user = user.unwrap();
 
-  (StatusCode::OK, Json(ErrOr::Res(user)))
+  (StatusCode::OK, Json(ErrOr::Res(UserWithoutPasswd::new(user))))
 }
